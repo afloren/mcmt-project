@@ -1,0 +1,240 @@
+\documentclass{beamer}
+\usepackage{natbib}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{dsfont}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator{\diag}{diag}
+
+\usetheme{CambridgeUS}
+
+\title{Applications of Hidden Markov Models}
+\author{Andrew Floren}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\section*{Introduction}
+\subsection*{Hidden Markov Model}
+\begin{frame}{Introduction}
+Let $X_1, X_2, \cdots, X_t$ be a Markov chain on the discrete domain $\Omega$ with transition probability matrix $P \in \mathbb{R}^{|\Omega| \times |\Omega|} $ where $P_{i,j} = P(X_{t+1} = j | X_{t} = i)$. Let $Y_1, Y_2, \cdots, Y_t$ be a series of random variables on the discrete domain $\Phi$ with observation probability matrix $O \in \mathbb{R}^{|\Omega| \times |\Phi|}$ where $O_{i,j} = P(Y_t = j | X_t = i)$ and each $Y_t$ is conditionally independent given $X_t$.
+\end{frame}
+
+\section{Filtering}
+\begin{frame}{Filtering}
+Want to find
+\begin{equation}
+\label{eqn:filtering}
+P(X_t | Y_1, Y_2, \cdots, Y_t).
+\end{equation}
+\end{frame}
+
+\begin{frame}
+First, let us consider how to calculate the full joint probability 
+\begin{equation}
+P(X_{t}, Y_{1}, Y_{2}, \cdots, Y_t)
+\end{equation}
+\end{frame}
+
+\begin{frame}
+\begin{align}
+&P(X_{t}, Y_{1}, Y_{2}, \cdots, Y_t)  \label{eqn:forward-message}\\
+&= P(Y_{t} | X_{t}, Y_{1}, \cdots, Y_{t-1}) P(X_{t}, Y_{1}, \cdots, Y_{t-1}) \\ 
+&= P(Y_{t} | X_{t}) P(X_{t}, Y_{1}, \cdots, Y_{t-1}) \\
+&= P(Y_{t} | X_{t}) \sum_{X_{t-1} \in \Omega}{P(X_{t}, X_{t-1}, Y_{1}, \cdots, Y_{t-1})} \\
+&= P(Y_{t} | X_{t}) \sum_{X_{t-1} \in \Omega}{P(X_{t} | X_{t-1}, Y_{1}, \cdots, Y_{t-1}) P(X_{t-1}, Y_{1}, \cdots, Y_{t-1})} \\
+&= P(Y_{t} | X_{t}) \sum_{X_{t-1} \in \Omega}{P(X_{t} | X_{t-1})P(X_{t-1}, Y_{1}, \cdots, Y_{t-1})}
+\end{align}
+Note that $P(Y_{t} | X_{t})$ and $P(X_{t} | X_{t-1})$ are defined directly by our model, and $P(X_{t-1}, Y_{1}, \cdots, Y_{t-1})$ is the same as equation \ref{eqn:forward-message} at time $t-1$.
+\end{frame}
+
+\begin{frame}
+To recover the conditional probability we calculate
+\begin{equation}
+P(X_t | Y_1, Y_{2}, \cdots, Y_t) = \frac{P(X_t, Y_1, Y_{2}, \cdots, Y_t)}{\sum_{X_t \in \Omega}{P(X_t, Y_1, Y_{2}, \cdots, Y_t)}}.
+\end{equation}
+\end{frame}
+
+\subsection{Forward Algorithm}
+\begin{frame}{Forward Algorithm}
+Given observations $y_1, y_2, \cdots, y_t$, a probability transition matrix $P$, an observation probability matrix $O$, an initial state distribution $\pi$, and $\alpha_i(x) = P(X_i = x, Y_1 = y_1, \cdots, Y_i = y_i)$, the filtered distribution of state $X_t \in \Omega$ can be determined using Algorithm \ref{alg:forward}.
+\begin{algorithm}[H]
+\caption{Forward Algorithm}
+\label{alg:forward}
+\begin{algorithmic}
+\STATE $\alpha_0 \leftarrow \pi$
+\FOR{$i \leftarrow 1$ \TO $t$}
+\STATE $\alpha_i \leftarrow \diag(O_{*,y_t}) \cdot P \cdot \alpha_{i-1}$
+\ENDFOR
+\RETURN $\frac{\alpha_t}{\|\alpha_t\|_1}$
+\end{algorithmic}
+\end{algorithm}
+\end{frame}
+
+\section{Smoothing}
+\begin{frame}{Smoothing}
+Want to find
+\begin{equation}
+\label{eqn:smoothing}
+P(X_k | Y_1, Y_2, \cdots, Y_t), 
+\end{equation}
+where $0<k<t$.
+\end{frame}
+
+\begin{frame}
+Similar to filtering, let us begin by considering the full joint probability 
+\begin{equation}
+P(X_{k}, Y_{1}, Y_{2}, \cdots, Y_t).
+\end{equation}
+\end{frame}
+
+\begin{frame}
+\begin{align}
+&P(X_k, Y_1, \cdots, Y_t) \\
+&= P(Y_{k+1}, \cdots, Y_t | X_k, Y_1, \cdots, Y_k) P(X_k,  Y_1, \cdots, Y_k) \\
+&= P(Y_{k+1}, \cdots, Y_t | X_k) P(X_k,  Y_1, \cdots, Y_k)
+\end{align}
+Note that $P(X_k, Y_1, \cdots, Y_k)$ is the unnormalized output of the forward algorithm up to time $k$. Therefore, we only need to solve 
+\begin{equation}
+P(Y_{k+1}, \cdots, Y_t | X_k).
+\end{equation}
+\end{frame}
+
+\begin{frame}
+\begin{align}
+&P(Y_{k+1}, \cdots, Y_t | X_k) \label{eqn:backward-message}\\
+&= \sum_{X_{k+1} \in \Omega}{P(Y_{k+1}, \cdots, Y_t, X_{k+1} | X_k)} \\
+&= \sum_{X_{k+1} \in \Omega}{P(Y_{k+1}, \cdots, Y_t | X_{k+1} , X_k) P(X_{k+1} | X_k)} \\
+&= \sum_{X_{k+1} \in \Omega}{P(Y_{k+1}, \cdots, Y_t | X_{k+1}) P(X_{k+1} | X_k)} \\
+&= \sum_{X_{k+1} \in \Omega}{P(Y_{k+1} | X_{k+1}) P(Y_{k+2}, \cdots, Y_t | X_{k+1}) P(X_{k+1} | X_k)} 
+\end{align}
+$P(Y_{k+1} | X_{k+1})$ and $P(X_{k+1} | X_k)$ are defined directly by our model, and $P(Y_{k+2}, \cdots, Y_t | X_{k+1})$ is the same as equation \ref{eqn:backward-message} at time $k+1$.
+\end{frame}
+
+\begin{frame}
+To recover the conditional probability we calculate
+\begin{equation}
+P(X_k | Y_1, Y_{2}, \cdots, Y_t) = \frac{P(X_k, Y_1, Y_{2}, \cdots, Y_t)}{\sum_{X_k \in \Omega}{P(X_k, Y_1, Y_{2}, \cdots, Y_t)}}
+\end{equation}
+\end{frame}
+
+\subsection{Forward-Backward Algorithm}
+\begin{frame}{Forward-Backward Algorithm}
+Given $y_1, y_2, \cdots, y_t$, $P$, $O$, $\pi$, $\alpha_i(x) = P(X_i = x , Y_1 = y_1, \cdots, Y_i = y_i)$, and $\beta_i(x) = P(Y_{i+1} = y_{i+1}, \cdots, Y_i = y_i | X_i = x)$, the smoothed distribution of state $X_k \in \Omega$ can be determined using Algorithm \ref{alg:forward-backward}.
+\begin{algorithm}[H]
+\caption{Forward-Backward Algorithm}
+\label{alg:forward-backward}
+\begin{algorithmic}
+\STATE $\alpha_0 \leftarrow \pi$
+\FOR{$i \leftarrow 1$ \TO $k$}
+\STATE $\alpha_i \leftarrow \diag(O_{*,y_i}) \cdot P \cdot \alpha_{i-1}$
+\ENDFOR
+\STATE $\beta_t \leftarrow \mathds{1}$
+\FOR{$i \leftarrow t-1$ \TO $k$}
+\STATE $\beta_i \leftarrow \diag(O_{*,y_{i+1}}) \cdot P \cdot \beta_{i+1}$
+\ENDFOR
+\RETURN $\frac{\alpha_k \cdot \beta_k}{\|\alpha_k \cdot \beta_k\|_1}$
+\end{algorithmic}
+\end{algorithm}
+\end{frame}
+
+\section{Maximum Likelihood Sequence}
+\begin{frame}{Maximum Likelihood Sequence}
+Want to find 
+\begin{equation}
+\argmax_{x_1, x_2, \cdots, x_t \in \Omega} P(X_1 = x_1, X_2 = x_2, \cdots, X_t = x_t | Y_1, Y_2, \cdots, Y_t).
+\end{equation}
+\end{frame}
+
+\begin{frame}
+Consider
+\begin{align}
+&\max_{x_1, \cdots, x_t} P(X_1 = x_1, \cdots, X_t = x_t, X_{t+1}, Y_1, \cdots, Y_t, Y_{t+1})&\\
+&\begin{multlined}
+= P(Y_{t+1} | X_{t+1}) \max_{X_t \in \Omega}(\\
+P(X_{t+1} | X_t) \max_{x_1, \cdots, x_{t-1} \in \Omega}P(X_1 = x_1, \cdots, X_{t-1} = x_{t-1}, X_t,\\
+Y_1, \cdots, Y_{t-1}, Y_t)).
+\end{multlined}
+\end{align}
+Note the strong similarity to the filtering problem except we are taking the max across states rather than the sum.
+\end{frame}
+
+\subsection{Viterbi Algorithm}
+\begin{frame}{Viterbi Algorithm}
+Given $y_1, y_2, \cdots, y_t \in \Phi$, $P$, $O$, $\pi$, and $\alpha_t(x) = \max_{x_1, \cdots, x_{t-1} \in \Omega}P(X_1 = x_1, \cdots, X_{t-1} = x_{t-1}, X_t = x, Y_1 = y_1, \cdots, Y_{t-1} = y_{t-1}, Y_t = y_t)$, we can determine the maximum probability sequence $x_1, x_2, \cdots, x_t \in \Omega$ using Algorithm \ref{alg:viterbi}.
+\begin{algorithm}[H]
+\caption{The Viterbi Algorithm}
+\label{alg:viterbi}
+\begin{algorithmic}
+\STATE $\alpha_0 \leftarrow \pi$
+\FOR{$i \leftarrow 1$ \TO $t$}
+\FORALL{$x$ such that $x \in \Omega$}
+\STATE $\alpha_i(x) \leftarrow O_{x,y_i} \cdot \max{\left( \diag(P_{x,*}) \cdot \alpha_{i-1} \right)}$
+\ENDFOR
+\STATE $x_i \leftarrow \argmax_{x \in \Omega}{\alpha_i(x)}$
+\ENDFOR
+\RETURN $(x_1, \cdots, x_t)$
+\end{algorithmic}
+\end{algorithm}
+\end{frame}
+
+\section{Decoding fMRI}
+\begin{frame}{Decoding fMRI}
+In my research, I am attempting to decode brain states from functional magnetic resonance imaging (fMRI) data.
+The level of neural activation in the brain is approximately captured by the blood-oxygen-level dependent (BOLD) signal.
+However, this signal is extremely noisy; the signal-to-noise ratio is generally on the order of 1.
+Therefore, we must integrate repeated measures to achieve good accuracy.
+Traditionally, this is done by averaging across blocks of time where the stimulus, and presumably the brain state, is constant.
+By leveraging a hidden Markov model, we can relax the constraints on the temporal structure of the stimulus and hidden brain states.
+However, to accurately model the state transition probabilities we need to use a discrete number of previous states.
+\end{frame}
+
+\subsection{Model}
+\begin{frame}{Model}
+The set of brain states we are interested in decoding is $\omega$, where $|\omega| = 6$ for our stimulus.
+The domain of the hidden states $X_1, \cdots, X_t$ is $\Omega = \omega^k$, where $k = 6$ is the number of memory states we use.
+This results in an extremely large but sparse state transition matrix $P$.
+The domain of the observable sequence $Y_1, \cdots, Y_t$ is $\Phi = \mathbb{R}^n$ where $n$ is the number of voxels we are measuring.
+We use a trained feed-forward neural network to approximate $P(X_t | Y_t)$ from the observed fMRI data.
+We can't generate an observation probability matrix because our observable domain is continuous, but by fitting a distribution to $P(Y_t)$ we can calculate $P(Y_t | X_t)$ using Bayes' rule.
+Fortunately, prior fMRI studies have shown that the distribution of fMRI data can be reasonably approximated by a multi-variate Gaussian after whitening.
+\end{frame}
+
+\subsection{Modified Forward Algorithm}
+\begin{frame}{Modified Forward Algorithm}
+Given observations $y_1, y_2, \cdots, y_t \in \Phi$, a probability transition matrix $P$, an observation probability distribution $P_y(x) \sim \mathbb{N}(\mu,\sigma)$, a function $N: \Phi \to \Omega$ that approximates $P(X_t | Y_t = y_t)$, an initial state distribution $\pi$, and $\alpha_i(x) = P(X_i = x, Y_1 = y_1, \cdots, Y_i = y_i)$, the filtered distribution for the state $X_t \in \Omega$ can be determined using Algorithm \ref{alg:modified-forward}.
+The performance of this algorithm should be estimated using a cross-validation procedure because the distribution $P_y$ and the function $N$ need to be constructed on a training set.
+\begin{algorithm}[H]
+\caption{Modified Forward Algorithm}
+\label{alg:modified-forward}
+\begin{algorithmic}
+\STATE $\alpha_0 \leftarrow \pi$
+\FOR{$i \leftarrow 1$ \TO $t$}
+\STATE $\alpha_i(x) \leftarrow \frac{N(y_t) P_y(y_t)}{\pi} \cdot P \cdot \alpha_{i-1}$
+\ENDFOR
+\RETURN $\frac{\alpha_t}{\|\alpha_t\|_1}$
+\end{algorithmic}
+\end{algorithm}
+\end{frame}
+
+\subsection{Results}
+\begin{frame}{Results}
+Still processing...
+\end{frame}
+
+\bibliographystyle{IEEEtranN}
+\nocite{Russell:2009:AIM:1671238}
+\nocite{viterbi1967error}
+\nocite{Richard1991}
+\begin{frame}{References}
+\bibliography{bibliography}
+\end{frame}
+
+\end{document}
